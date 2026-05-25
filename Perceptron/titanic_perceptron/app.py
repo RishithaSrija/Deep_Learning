@@ -6,6 +6,11 @@ import matplotlib.pyplot as plt
 # =========================================================
 # PAGE CONFIG
 # =========================================================
+try:
+    import tensorflow as tf
+    TF_AVAILABLE = True
+except ImportError:
+    TF_AVAILABLE = False
 
 st.set_page_config(
     page_title="Titanic Survival Prediction",
