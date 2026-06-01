@@ -1,19 +1,22 @@
 import streamlit as st
 import tensorflow as tf
 import pickle
-import numpy as np
+import pandas as pd
 import re
 from tensorflow.keras.preprocessing.sequence import pad_sequences
-# import nltk
 
-# try:
-#     nltk.data.find("corpora/stopwords")
-# except:
-#     nltk.download("stopwords")
 # -----------------------
-# PAGE CONFIG
+# PAGE CONFIG (MUST BE FIRST STREAMLIT COMMAND)
 # -----------------------
-# st.balloons()
+st.set_page_config(
+    page_title="Movie Review Sentiment Analysis",
+    page_icon="🎬",
+    layout="wide"
+)
+
+# -----------------------
+# MOVIE LOGO
+# -----------------------
 st.markdown(
     """
     <div style='text-align:center;'>
@@ -24,17 +27,14 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-st.set_page_config(
-    page_title="Movie Review Sentiment Analysis",
-    page_icon="🎬",
-    layout="wide"
-)
-
 # -----------------------
 # LOAD CSS
 # -----------------------
 with open("style.css") as f:
-    st.markdown(f"<style>{f.read()}</style>", unsafe_allow_html=True)
+    st.markdown(
+        f"<style>{f.read()}</style>",
+        unsafe_allow_html=True
+    )
 
 # -----------------------
 # LOAD MODELS
@@ -56,6 +56,10 @@ def load_models():
 
     return rnn, lstm, gru
 
+
+# IMPORTANT
+rnn_model, lstm_model, gru_model = load_models()
+
 # -----------------------
 # LOAD TOKENIZER
 # -----------------------
@@ -65,7 +69,7 @@ with open("imdb_tokenizer.pkl", "rb") as f:
 MAX_LEN = 200
 
 # -----------------------
-# PREPROCESSING
+# TEXT PREPROCESSING
 # -----------------------
 def clean_text(text):
 
@@ -76,6 +80,7 @@ def clean_text(text):
     text = re.sub(r'[^a-zA-Z\s]', '', text)
 
     return text
+
 
 def prepare(text):
 
@@ -90,6 +95,7 @@ def prepare(text):
     )
 
     return padded
+
 
 # -----------------------
 # HEADER
@@ -124,28 +130,43 @@ review = st.text_area(
 )
 
 # -----------------------
-# PREDICT
+# ANALYZE REVIEW
 # -----------------------
 if st.button("🎥 Analyze Review"):
 
     if review.strip() == "":
         st.warning("Please enter a review.")
+
     else:
 
         data = prepare(review)
 
         if model_choice == "SimpleRNN":
-            pred = rnn_model.predict(data)[0][0]
+            pred = float(
+                rnn_model.predict(data, verbose=0)[0][0]
+            )
 
         elif model_choice == "LSTM":
-            pred = lstm_model.predict(data)[0][0]
+            pred = float(
+                lstm_model.predict(data, verbose=0)[0][0]
+            )
 
         else:
-            pred = gru_model.predict(data)[0][0]
+            pred = float(
+                gru_model.predict(data, verbose=0)[0][0]
+            )
 
-        sentiment = "Positive" if pred > 0.5 else "Negative"
+        sentiment = (
+            "Positive"
+            if pred > 0.5
+            else "Negative"
+        )
 
-        confidence = pred if pred > 0.5 else (1 - pred)
+        confidence = (
+            pred
+            if pred > 0.5
+            else (1 - pred)
+        )
 
         positive_prob = pred * 100
         negative_prob = (1 - pred) * 100
@@ -155,17 +176,20 @@ if st.button("🎥 Analyze Review"):
         st.markdown(
             f"""
             <div class='result-box'>
-            <h2>Sentiment: {sentiment}</h2>
-            <h3>Confidence: {confidence*100:.2f}%</h3>
+                <h2>Sentiment: {sentiment}</h2>
+                <h3>Confidence: {confidence*100:.2f}%</h3>
             </div>
             """,
             unsafe_allow_html=True
         )
+
+        # Effects
         if sentiment == "Positive":
 
             st.success(
-            f"🎉 Positive Review Detected ({confidence*100:.2f}%)"
+                f"🎉 Positive Review Detected ({confidence*100:.2f}%)"
             )
+
             st.balloons()
 
         else:
@@ -173,50 +197,91 @@ if st.button("🎥 Analyze Review"):
             st.error(
                 f"😞 Negative Review Detected ({confidence*100:.2f}%)"
             )
-            
 
-        st.subheader("Prediction Probabilities")
+            st.snow()
 
-        st.progress(int(positive_prob))
-        st.write(f"Positive Probability: {positive_prob:.2f}%")
+        # Probability Section
+        st.subheader("📊 Prediction Probabilities")
 
-        st.progress(int(negative_prob))
-        st.write(f"Negative Probability: {negative_prob:.2f}%")
+        st.write(
+            f"Positive Probability: {positive_prob:.2f}%"
+        )
+        st.progress(
+            min(int(positive_prob), 100)
+        )
+
+        st.write(
+            f"Negative Probability: {negative_prob:.2f}%"
+        )
+        st.progress(
+            min(int(negative_prob), 100)
+        )
 
 # -----------------------
 # COMPARE ALL MODELS
 # -----------------------
 st.markdown("---")
-st.subheader("🎭 Compare All Models")
+
+st.subheader(
+    "🎭 Compare Predictions from All Models"
+)
 
 if st.button("Compare Predictions"):
 
-    if review.strip() != "":
+    if review.strip() == "":
+
+        st.warning(
+            "Please enter a review first."
+        )
+
+    else:
 
         data = prepare(review)
 
-        rnn_pred = rnn_model.predict(data)[0][0]
-        lstm_pred = lstm_model.predict(data)[0][0]
-        gru_pred = gru_model.predict(data)[0][0]
+        rnn_pred = float(
+            rnn_model.predict(data, verbose=0)[0][0]
+        )
 
-        import pandas as pd
+        lstm_pred = float(
+            lstm_model.predict(data, verbose=0)[0][0]
+        )
 
-        df = pd.DataFrame({
-            "Model":["SimpleRNN","LSTM","GRU"],
-            "Confidence":[
-                round(max(rnn_pred,1-rnn_pred)*100,2),
-                round(max(lstm_pred,1-lstm_pred)*100,2),
-                round(max(gru_pred,1-gru_pred)*100,2)
+        gru_pred = float(
+            gru_model.predict(data, verbose=0)[0][0]
+        )
+
+        comparison_df = pd.DataFrame({
+
+            "Model": [
+                "SimpleRNN",
+                "LSTM",
+                "GRU"
             ],
-            "Sentiment":[
-                "Positive" if rnn_pred>0.5 else "Negative",
-                "Positive" if lstm_pred>0.5 else "Negative",
-                "Positive" if gru_pred>0.5 else "Negative"
+
+            "Sentiment": [
+                "Positive" if rnn_pred > 0.5 else "Negative",
+                "Positive" if lstm_pred > 0.5 else "Negative",
+                "Positive" if gru_pred > 0.5 else "Negative"
+            ],
+
+            "Confidence (%)": [
+                round(max(rnn_pred, 1-rnn_pred)*100, 2),
+                round(max(lstm_pred, 1-lstm_pred)*100, 2),
+                round(max(gru_pred, 1-gru_pred)*100, 2)
             ]
         })
 
-        st.dataframe(df, use_container_width=True)
+        st.dataframe(
+            comparison_df,
+            use_container_width=True
+        )
+
+        st.subheader(
+            "📈 Confidence Comparison"
+        )
 
         st.bar_chart(
-            df.set_index("Model")["Confidence"]
+            comparison_df.set_index("Model")[
+                "Confidence (%)"
+            ]
         )
